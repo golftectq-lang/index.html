@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Role-Play Bot (Rise 360)</title>
+  <style>
+    :root{--b:#e5e7eb;--t:#111827;--m:#6b7280;--bg:#fff;--soft:#f9fafb;}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--soft);color:var(--t);}
+    .wrap{max-width:980px;margin:0 auto;padding:16px;}
+    .card{background:var(--bg);border:1px solid var(--b);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+    header{padding:14px 16px 10px;border-bottom:1px solid var(--b);}
+    header h1{margin:0;font-size:16px;}
+    header p{margin:6px 0 0;color:var(--m);font-size:13px;}
+
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;padding:14px;}
+    @media (max-width:860px){.grid{grid-template-columns:1fr;}}
+    .panel{border:1px solid var(--b);border-radius:12px;background:#fff;overflow:hidden;}
+    .panel h2{margin:0;padding:12px;font-size:14px;border-bottom:1px solid var(--b);}
+    .chat{height:480px;overflow:auto;padding:12px;background:#fcfcfd;}
+    .msg{display:flex;gap:10px;margin:10px 0;align-items:flex-start;}
+    .avatar{width:28px;height:28px;border-radius:999px;border:1px solid var(--b);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex:0 0 auto;background:#fff;}
+    .bubble{border:1px solid var(--b);border-radius:12px;padding:10px;font-size:14px;line-height:1.35;background:#fff;max-width:92%;white-space:pre-wrap;}
+    .coach .avatar{background:#eef2ff;}
+    .golfer .avatar{background:#ecfeff;}
+    .coach .bubble{background:#f8fafc;}
+    .content{padding:12px;}
+    .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+    select,input{border:1px solid var(--b);border-radius:10px;padding:10px;font-size:13px;background:#fff;}
+    input{flex:1;min-width:240px;}
+    button{border:1px solid var(--b);background:#fff;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;}
+    button:hover{background:#f9fafb;}
+    button.primary{background:#111827;color:#fff;border-color:#111827;}
+    button.primary:hover{background:#0b1220;}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--b);border-radius:999px;font-size:12px;color:var(--m);background:#fff;}
+    .score{font-weight:700;color:var(--t);}
+    .meta{font-size:12px;color:var(--m);line-height:1.4;}
+    .divider{height:1px;background:var(--b);margin:12px 0;}
+    .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;background:#f3f4f6;border:1px solid var(--b);padding:2px 6px;border-radius:8px;}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <header>
+      <h1>Role-Play Bot (Coach Objection Practice)</h1>
+      <p>Pick an objection scenario. Type your coach response. The golfer responds automatically + you get coaching feedback.</p>
+    </header>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Conversation</h2>
+        <div id="chat" class="chat" aria-live="polite"></div>
+
+        <div class="content">
+          <div class="row">
+            <span class="pill">Scenario: <span class="score" id="scenarioName">Cost</span></span>
+            <span class="pill">Turn: <span class="score" id="turn">0</span></span>
+            <span class="pill">Score: <span class="score" id="score">0</span>/100</span>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row">
+            <label class="meta" for="scenario">Scenario</label>
+            <select id="scenario">
+              <option value="cost">Cost (“too expensive”)</option>
+              <option value="cantAfford">Can’t afford it (true constraint)</option>
+              <option value="time">Time (“I don’t have time”)</option>
+              <option value="think">Think about it</option>
+            </select>
+            <button class="primary" id="startBtn">Start / Restart</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="meta">Type your reply (coach). Press <span class="kbd">Enter</span> to send.</div>
+          <div class="row" style="margin-top:6px;">
+            <input id="coachInput" type="text" placeholder="Type your coach response..." />
+            <button class="primary" id="sendBtn">Send</button>
+          </div>
+
+          <div class="meta" style="margin-top:10px;">
+            Tip: Clarify → Re-anchor → Reframe → Close.
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <h2>Feedback</h2>
+        <div class="content">
+          <div class="meta"><b>Scoring:</b> +25 each for Clarify / Re-anchor / Reframe / Close</div>
+          <div class="divider"></div>
+          <div class="meta"><b>Live feedback:</b></div>
+          <div id="feedback" class="meta">Start a scenario to begin.</div>
+          <div class="divider"></div>
+          <div class="meta">
+            <b>Coach shortcuts:</b><br/>
+            • Clarify: “Is it total or monthly?” / “Is it lessons or practice time?”<br/>
+            • Re-anchor: “You mentioned your goal was…”<br/>
+            • Reframe: “If nothing changes…” / “This makes practice more efficient…”<br/>
+            • Close: “Does it make sense to get started today?”
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<script>
+  // -----------------------------
+  // Scenario scripts (edit freely)
+  // -----------------------------
+  const SCENARIOS = {
+    cost: {
+      name: "Cost",
+      opener: [
+        ["coach","Based on what we measured today and your goals, I recommend we start coaching with a plan focused on your biggest issue."],
+        ["coach","Does it make sense to get started today?"],
+        ["golfer","Not really — it’s too expensive."]
+      ],
+      respond: (coachText, s) => {
+        const x = coachText.toLowerCase();
+        if (coachText.includes("?") && (x.includes("total") && x.includes("monthly"))) return "Total investment.";
+        if (coachText.includes("?") && x.includes("least worth")) return "I’m just not sure it’s worth that much.";
+        if (coachText.includes("?") && x.includes("how long")) return "A couple years, honestly.";
+        if (coachText.includes("?") && x.includes("if nothing changes")) return "I’d probably be stuck in the same place.";
+        if (coachText.includes("?") && (x.includes("does it make sense") || x.includes("ready to start"))) return "If we can make the value feel clear, I’m open.";
+        // escalate lightly if coach doesn't clarify
+        s.escalate++;
+        return s.escalate >= 2 ? "Can you help me understand why it costs that much?" : "I like it… it’s just a lot.";
+      }
+    },
+
+    cantAfford: {
+      name: "Can't Afford",
+      opener: [
+        ["coach","Based on what we saw today, a structured plan will get you improving instead of guessing."],
+        ["coach","Does it make sense to get started today?"],
+        ["golfer","I want to do it — I just can’t afford it."]
+      ],
+      respond: (coachText, s) => {
+        const x = coachText.toLowerCase();
+        if (coachText.includes("?") && (x.includes("total") || x.includes("monthly"))) return "Monthly is the problem.";
+        if (coachText.includes("?") && x.includes("comfortable range")) return "$___ per month is about my limit.";
+        if (x.includes("start smaller") || x.includes("smaller plan") || x.includes("fewer lessons")) return "That would help. I could start smaller.";
+        if (coachText.includes("?") && (x.includes("would you want to start") || x.includes("does it make sense"))) return "Yes, if it fits my budget.";
+        s.escalate++;
+        return s.escalate >= 2 ? "I’m not saying no — I just truly can’t swing that number." : "My budget is tight right now.";
+      }
+    },
+
+    time: {
+      name: "Time",
+      opener: [
+        ["coach","To improve consistency fastest, I recommend a plan with a weekly cadence."],
+        ["coach","Does it make sense to get started today?"],
+        ["golfer","I don’t have time for this."]
+      ],
+      respond: (coachText, s) => {
+        const x = coachText.toLowerCase();
+        if (coachText.includes("?") && (x.includes("lesson") || x.includes("practice"))) return "Mostly practice time.";
+        if (coachText.includes("?") && x.includes("how much time")) return "Maybe an hour or two on weekends.";
+        if (x.includes("more efficient") || x.includes("structured")) return "Efficiency would help— I hate wasting time.";
+        if (x.includes("flexible") || x.includes("schedule")) return "Flexibility would make it doable.";
+        if (coachText.includes("?") && (x.includes("does it make sense") || x.includes("ready to start"))) return "If it truly fits my schedule, yes.";
+        s.escalate++;
+        return s.escalate >= 2 ? "I’m worried I’ll pay and not use it." : "My schedule is crazy right now.";
+      }
+    },
+
+    think: {
+      name: "Think About It",
+      opener: [
+        ["coach","This plan targets your biggest miss and tracks progress every session."],
+        ["coach","Does it make sense to get started today?"],
+        ["golfer","I need to think about it."]
+      ],
+      respond: (coachText, s) => {
+        const x = coachText.toLowerCase();
+        if (coachText.includes("?") && x.includes("what specifically")) return "I’m not sure it’ll work for me.";
+        if (coachText.includes("?") && (x.includes("six months") || x.includes("if nothing changes"))) return "Probably the same as now.";
+        if (x.includes("track progress") || x.includes("measure")) return "That makes sense. I like the structure.";
+        if (coachText.includes("?") && (x.includes("does it make sense") || x.includes("ready to start"))) return "If I feel confident it’ll work, yes.";
+        s.escalate++;
+        return s.escalate >= 2 ? "What would you say to someone who’s tried lessons before?" : "I’m not saying no — just not ready today.";
+      }
+    }
+  };
+
+  // -----------------------------
+  // Scoring (simple + coachable)
+  // -----------------------------
+  const lower = (s) => (s||"").toLowerCase();
+  const hasClarify = (text) => text.includes("?") || /help me understand|what specifically|when you say|is it|which part/i.test(text);
+  const hasReanchor = (text) => /you said|you mentioned|your goal|what you told me|biggest frustration/i.test(text);
+  const hasReframe  = (text) => /if nothing changes|cost of|fast-forward|delay|stuck|more efficient|wasting time/i.test(text);
+  const hasClose    = (text) => /does it make sense to get started|are you ready to start|should we get started|do you want to get started|let’s get started|lets get started/i.test(text);
+
+  // -----------------------------
+  // UI state
+  // -----------------------------
+  const chatEl = document.getElementById("chat");
+  const feedbackEl = document.getElementById("feedback");
+  const scenarioEl = document.getElementById("scenario");
+  const scenarioNameEl = document.getElementById("scenarioName");
+  const turnEl = document.getElementById("turn");
+  const scoreEl = document.getElementById("score");
+  const coachInput = document.getElementById("coachInput");
+
+  let scenarioKey = "cost";
+  let turn = 0;
+  let bestScore = 0;
+  let simState = { escalate: 0 };
+
+  function addMsg(role, text){
+    const row = document.createElement("div");
+    row.className = `msg ${role}`;
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = role === "coach" ? "C" : "G";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    chatEl.appendChild(row);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  function reset(){
+    chatEl.innerHTML = "";
+    turn = 0;
+    bestScore = 0;
+    simState = { escalate: 0 };
+    turnEl.textContent = "0";
+    scoreEl.textContent = "0";
+    feedbackEl.textContent = "Start a scenario to begin.";
+  }
+
+  function start(){
+    reset();
+    scenarioNameEl.textContent = SCENARIOS[scenarioKey].name;
+    SCENARIOS[scenarioKey].opener.forEach(([r,t])=>addMsg(r,t));
+    feedbackEl.textContent = "Respond as the coach. Aim for: clarify → re-anchor → reframe → close.";
+    coachInput.value = "";
+    coachInput.focus();
+  }
+
+  function scoreAttempt(text){
+    let earned = 0;
+    const checks = [];
+    if (hasClarify(text)) { earned += 25; checks.push("✅ Clarify"); } else checks.push("⬜ Clarify");
+    if (hasReanchor(text)) { earned += 25; checks.push("✅ Re-anchor"); } else checks.push("⬜ Re-anchor");
+    if (hasReframe(text)) { earned += 25; checks.push("✅ Reframe"); } else checks.push("⬜ Reframe");
+    if (hasClose(text)) { earned += 25; checks.push("✅ Close"); } else checks.push("⬜ Close");
+
+    bestScore = Math.max(bestScore, earned);
+    scoreEl.textContent = String(bestScore);
+
+    feedbackEl.textContent = checks.join("  •  ") + "  |  Next: ask ONE clarifying question, tie to their goal, then close.";
+  }
+
+  function sendCoach(){
+    const text = coachInput.value.trim();
+    if (!text) return;
+
+    addMsg("coach", text);
+    scoreAttempt(text);
+
+    const golferReply = SCENARIOS[scenarioKey].respond(text, simState);
+    window.setTimeout(()=>addMsg("golfer", golferReply), 220);
+
+    coachInput.value = "";
+    coachInput.focus();
+
+    turn += 1;
+    turnEl.textContent = String(turn);
+  }
+
+  document.getElementById("startBtn").addEventListener("click", start);
+  document.getElementById("sendBtn").addEventListener("click", sendCoach);
+  coachInput.addEventListener("keydown", (e)=>{ if(e.key==="Enter") sendCoach(); });
+  scenarioEl.addEventListener("change",(e)=>{ scenarioKey = e.target.value; scenarioNameEl.textContent = SCENARIOS[scenarioKey].name; });
+
+  start();
+</script>
+</body>
+</html>
